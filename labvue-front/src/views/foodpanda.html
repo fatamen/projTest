@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>餐廳外送平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f7f7f7;
+        }
+
+        /* 導航欄 */
+        .navbar {
+            background-color: #d70f64;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar .logo {
+            font-size: 26px;
+            font-weight: bold;
+        }
+
+        .navbar .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .navbar .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 16px;
+        }
+
+        .navbar .location {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navbar input {
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            width: 200px;
+        }
+
+        /* 搜尋與位置區域 */
+        .hero-section {
+            background-color: #fff;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .hero-section h1 {
+            font-size: 30px;
+            margin-bottom: 10px;
+        }
+
+        .hero-section p {
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .hero-section input {
+            width: 60%;
+            max-width: 400px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .hero-section button {
+            padding: 10px 20px;
+            background-color: #d70f64;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        /* 內容容器 */
+        .content-container {
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* 左側篩選欄 */
+        .sidebar {
+            width: 250px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar h3 {
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .filter-group {
+            margin-bottom: 20px;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .filter-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .filter-group input[type="range"] {
+            width: 100%;
+        }
+
+        .filter-group .range-value {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        /* 篩選與排序（頂部） */
+        .filters {
+            padding: 15px 20px;
+            background-color: #fff;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .filters .filter-buttons button {
+            padding: 8px 16px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            cursor: pointer;
+            border-radius: 20px;
+            margin-right: 10px;
+        }
+
+        .filters .filter-buttons button:hover {
+            background-color: #d70f64;
+            color: white;
+        }
+
+        .filters .sort select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        /* 餐廳列表 */
+        .restaurant-list {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .restaurant-card {
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .restaurant-card:hover {
+            transform: scale(1.02);
+        }
+
+        .restaurant-card img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+        }
+
+        .restaurant-card .info {
+            padding: 15px;
+        }
+
+        .restaurant-card h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .restaurant-card p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .restaurant-card .tags {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .restaurant-card .tags span {
+            background-color: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        /* 頁腳 */
+        .footer {
+            background-color: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .footer a {
+            color: #d70f64;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .content-container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                display: none; /* 預設隱藏 */
+            }
+
+            .sidebar.active {
+                display: block; /* 點擊按鈕顯示 */
+            }
+
+            .filter-toggle {
+                display: block;
+                padding: 10px;
+                background-color: #d70f64;
+                color: white;
+                text-align: center;
+                cursor: pointer;
+                margin-bottom: 10px;
+                border-radius: 4px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .filter-toggle {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 導航欄 -->
+    <header class="navbar">
+        <div class="logo">外送平台</div>
+        <div class="location">
+            <input type="text" placeholder="輸入地址" value="台北市中正區">
+            <button style="background: transparent; border: none; color: white;">📍</button>
+        </div>
+        <div class="nav-links">
+            <a href="#">餐廳</a>
+            <a href="#">優惠</a>
+            <a href="#">我的訂單</a>
+            <a href="#">登入</a>
+        </div>
+    </header>
+
+    <!-- 搜尋與位置區域 -->
+    <section class="hero-section">
+        <h1>探索附近美食</h1>
+        <p>當前位置：台北市中正區</p>
+        <input type="text" placeholder="輸入您的地址">
+        <button>搜尋</button>
+    </section>
+
+    <!-- 篩選與排序（頂部） -->
+    <section class="filters">
+        <div class="filter-buttons">
+            <button>全部</button>
+            <button>中式</button>
+            <button>日式</button>
+            <button>西式</button>
+            <button>免運費</button>
+        </div>
+        <div class="sort">
+            <select>
+                <option>排序：預設</option>
+                <option>評分最高</option>
+                <option>距離最近</option>
+                <option>最快送達</option>
+            </select>
+        </div>
+    </section>
+
+    <!-- 內容容器 -->
+    <div class="content-container">
+        <!-- 左側篩選欄 -->
+        <aside class="sidebar">
+            <h3>篩選條件</h3>
+            <div class="filter-group">
+                <h4>美食類型</h4>
+                <label><input type="checkbox" name="cuisine" value="chinese"> 中式</label>
+                <label><input type="checkbox" name="cuisine" value="japanese"> 日式</label>
+                <label><input type="checkbox" name="cuisine" value="western"> 西式</label>
+                <label><input type="checkbox" name="cuisine" value="korean"> 韓式</label>
+            </div>
+            <div class="filter-group">
+                <h4>配送時間</h4>
+                <input type="range" min="10" max="60" value="30" oninput="this.nextElementSibling.textContent = this.value + ' 分鐘'">
+                <div class="range-value">30 分鐘</div>
+            </div>
+            <div class="filter-group">
+                <h4>優惠活動</h4>
+                <label><input type="checkbox" name="promo" value="free-delivery"> 免運費</label>
+                <label><input type="checkbox" name="promo" value="discount"> 折扣</label>
+            </div>
+            <div class="filter-group">
+                <h4>評分</h4>
+                <label><input type="checkbox" name="rating" value="4"> 4 星以上</label>
+                <label><input type="checkbox" name="rating" value="3"> 3 星以上</label>
+            </div>
+        </aside>
+
+        <!-- 餐廳列表 -->
+        <section class="restaurant-list">
+            <div class="restaurant-card">
+                <img src="https://via.placeholder.com/280x160" alt="餐廳圖片">
+                <div class="info">
+                    <h3>美味餐廳</h3>
+                    <p>中式料理 • 20-30 分鐘 • 免運費</p>
+                    <p>★★★★☆ (120+ 評價)</p>
+                    <div class="tags">
+                        <span>滷肉飯</span>
+                        <span>便當</span>
+                    </div>
+                </div>
+            </div>
+            <div class="restaurant-card">
+                <img src="https://via.placeholder.com/280x160" alt="餐廳圖片">
+                <div class="info">
+                    <h3>壽司之家</h3>
+                    <p>日式料理 • 15-25 分鐘</p>
+                    <p>★★★★★ (200+ 評價)</p>
+                    <div class="tags">
+                        <span>壽司</span>
+                        <span>生魚片</span>
+                    </div>
+                </div>
+            </div>
+            <div class="restaurant-card">
+                <img src="https://via.placeholder.com/280x160" alt="餐廳圖片">
+                <div class="info">
+                    <h3>披薩樂園</h3>
+                    <p>西式料理 • 25-35 分鐘 • 滿 $200 免運</p>
+                    <p>★★★★☆ (150+ 評價)</p>
+                    <div class="tags">
+                        <span>披薩</span>
+                        <span>義大利麵</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 頁腳 -->
+    <footer class="footer">
+        <p>© 2025 外送平台. 版權所有。</p>
+        <p>
+            <a href="#">關於我們</a>
+            <a href="#">聯繫我們</a>
+            <a href="#">隱私政策</a>
+            <a href="#">服務條款</a>
+        </p>
+    </footer>
+
+    <script>
+        // 行動裝置篩選欄切換
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleButton = document.createElement('div');
+            toggleButton.className = 'filter-toggle';
+            toggleButton.textContent = '篩選條件';
+            const sidebar = document.querySelector('.sidebar');
+            const filtersSection = document.querySelector('.filters');
+            filtersSection.insertAdjacentElement('beforebegin', toggleButton);
+
+            toggleButton.addEventListener('click', () => {
+                sidebar.classList.toggle('active');
+            });
+        });
+    </script>
+</body>
+</html>
