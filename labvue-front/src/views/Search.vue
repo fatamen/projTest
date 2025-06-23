@@ -1,17 +1,17 @@
 <template>
     <!-- 導航欄 -->
     <header class="navbar">
-        <div class="logo">外送平台</div>        
+        <div class="logo">外送平台</div>
         <div class="nav-links">
             <a href="#" @click.prevent="toggleRestaurantMenu">{{ isRestaurant ? '餐廳' : '餐點' }}</a>
-            <a href="#">優惠</a>
-            <a href="#">我的訂單</a>
+            <a href="#">優惠通知</a>
+            <a href="#">購物車</a>
             <a href="#">登入</a>
         </div>
     </header>
 
     <!-- 搜尋與位置區域 -->
-    <section class="hero-section">
+    <!-- <section class="hero-section">
         <h1>探索附近美食</h1>
         <p>當前位置：{{ address || '台北市中正區' }}</p>
         <input type="text" placeholder="輸入您的地址" v-model="address" />
@@ -22,7 +22,7 @@
             經緯度：{{ coordinates.lat }}, {{ coordinates.lon }}
         </p>
         <p v-else-if="error" class="error">{{ error }}</p>
-    </section>
+    </section> -->
 
     <!-- 附近熱門美食 -->
     <section class="popular-section">
@@ -37,6 +37,44 @@
                     <div class="tags">
                         <span v-for="tag in restaurant.tags" :key="tag">{{ tag }}</span>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- <section class="hero-section">
+        <h1>探索附近美食</h1>
+        <input type="text" placeholder="輸入您的查詢內容" v-model="searched" />
+        <button @click="getSearched">搜尋</button>
+    </section> -->
+    <section class="hero-section">
+        <h1>探索附近美食</h1>
+        <div class="search-container">
+            <input type="text" placeholder="輸入您的查詢內容" v-model="searched" @focus="showDropdown = true"
+                @blur="hideDropdownWithDelay" @input="filterSuggestions" @keydown.enter="handleSearch" />
+            <button @click="handleSearch">搜尋</button>
+            <div class="search-dropdown" v-show="showDropdown">
+                <!-- 搜索歷史 -->
+                <div class="search-section" v-if="searchHistory.length > 0">
+                    <h4>最近搜尋</h4>
+                    <ul>
+                        <li v-for="(item, index) in filteredHistory" :key="index"
+                            @mousedown.prevent="selectSuggestion(item)" class="search-item">
+                            {{ item }}
+                            <button class="clear-history" @mousedown.prevent="removeHistoryItem(index)">✕</button>
+                        </li>
+                    </ul>
+                </div>
+                <!-- 熱門搜索 -->
+                <div class="search-section">
+                    <h4>熱門搜尋</h4>
+                    <ul>
+                        <li v-for="(item, index) in filteredHotSearches" :key="index"
+                            @mousedown.prevent="selectSuggestion(item)" class="search-item">
+                            {{ item }}
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -75,7 +113,8 @@
             </div>
             <div class="filter-group">
                 <h4>配送時間</h4>
-                <input type="range" min="0" max="60" v-model.number="filters.deliveryTime" @input="updateDeliveryTime" />
+                <input type="range" min="0" max="60" v-model.number="filters.deliveryTime"
+                    @input="updateDeliveryTime" />
                 <div class="range-value">{{ filters.deliveryTime }} 分鐘</div>
             </div>
             <div class="filter-group">
@@ -93,7 +132,7 @@
         <!-- 餐廳列表 -->
         <section class="restaurant-list">
             <div class="restaurant-card" v-for="restaurant in filteredRestaurants" :key="restaurant.id">
-                <img :src="restaurant.image" :alt="restaurant.name" />                
+                <img :src="restaurant.image" :alt="restaurant.name" />
                 <div class="info">
                     <h3>{{ restaurant.name }}</h3>
                     <p>{{ restaurant.cuisine }} • {{ restaurant.deliveryTime }} 分鐘 • {{ restaurant.promo || '' }}</p>
@@ -120,6 +159,72 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+
+
+// 搜索相關
+const searched = ref(''); // 當前輸入的搜索內容
+const searchHistory = ref(JSON.parse(localStorage.getItem('searchHistory')) || []); // 搜索歷史
+const hotSearches = ref(['滷肉飯', '壽司', '披薩', '炸雞', '義大利麵']); // 熱門搜索
+const showDropdown = ref(false); // 控制下拉清單顯示
+const filteredHistory = ref([]); // 過濾後的搜索歷史
+const filteredHotSearches = ref([...hotSearches.value]); // 過濾後的熱門搜索
+
+// 保存搜索歷史到 localStorage
+const saveSearchHistory = () => {
+    localStorage.setItem('searchHistory', JSON.stringify(searchHistory.value));
+};
+
+// 點擊搜尋或按 Enter 鍵處理搜索
+const handleSearch = () => {
+    if (searched.value.trim()) {
+        if (!searchHistory.value.includes(searched.value)) {
+            searchHistory.value.unshift(searched.value); // 將新搜索添加到歷史開頭
+            if (searchHistory.value.length > 5) {
+                searchHistory.value.pop(); // 限制歷史記錄最多 5 條
+            }
+            saveSearchHistory();
+        }
+        // 這裡可以添加實際的搜索邏輯，例如過濾餐廳
+        console.log('搜尋內容:', searched.value);
+        showDropdown.value = false; // 搜索後隱藏下拉清單
+    }
+};
+
+// 選擇建議項
+const selectSuggestion = (item) => {
+    searched.value = item;
+    handleSearch();
+};
+
+// 刪除單個搜索歷史
+const removeHistoryItem = (index) => {
+    searchHistory.value.splice(index, 1);
+    saveSearchHistory();
+};
+
+// 過濾建議（歷史和熱門搜索）
+const filterSuggestions = () => {
+    const query = searched.value.toLowerCase().trim();
+    filteredHistory.value = searchHistory.value.filter((item) =>
+        item.toLowerCase().includes(query)
+    );
+    filteredHotSearches.value = hotSearches.value.filter((item) =>
+        item.toLowerCase().includes(query)
+    );
+};
+
+// 延遲隱藏下拉清單（防止點擊建議時立即關閉）
+const hideDropdownWithDelay = () => {
+    setTimeout(() => {
+        showDropdown.value = false;
+    }, 200);
+};
+
+// 初始化時加載搜索歷史
+onMounted(() => {
+    filterSuggestions(); // 初始化建議清單
+});
+
 
 //地址查詢用
 const address = ref('請輸入要查詢的地址'); // 儲存輸入的地址
@@ -209,40 +314,40 @@ const getCoordinates = async () => {
 
 // 獲取當前位置
 const getCurrentLocation = async () => {
-  if (!navigator.geolocation) {
-    alert('您的瀏覽器不支援定位功能');
-    return;
-  }
-
-  try {
-    const position = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject);
-    });
-
-    const { latitude, longitude } = position.coords;
-
-    // 使用 OpenStreetMap Nominatim API 將座標轉為地址
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
-    );
-    const data = await response.json();
-
-    if (data && data.display_name) {
-      address.value = data.display_name; // 更新地址
-    } else {
-      alert('無法解析地址，請稍後再試');
+    if (!navigator.geolocation) {
+        alert('您的瀏覽器不支援定位功能');
+        return;
     }
-  } catch (error) {
-    console.error('定位失敗:', error);
-    alert('無法獲取位置，請檢查權限或稍後再試');
-  }
+
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+
+        const { latitude, longitude } = position.coords;
+
+        // 使用 OpenStreetMap Nominatim API 將座標轉為地址
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
+        );
+        const data = await response.json();
+
+        if (data && data.display_name) {
+            address.value = data.display_name; // 更新地址
+        } else {
+            alert('無法解析地址，請稍後再試');
+        }
+    } catch (error) {
+        console.error('定位失敗:', error);
+        alert('無法獲取位置，請檢查權限或稍後再試');
+    }
 };
 
 // 餐廳/餐點切換
 const isRestaurant = ref(true);
 const toggleRestaurantMenu = () => {
     isRestaurant.value = !isRestaurant.value;
-    console.log("目前頁面餐廳為是/餐點為否:"+isRestaurant.value);
+    console.log("目前頁面餐廳為是/餐點為否:" + isRestaurant.value);
 };
 
 // 餐廳數據
@@ -755,6 +860,91 @@ body {
     text-decoration: none;
     margin: 0 10px;
 }
+
+
+.search-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.search-container input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+}
+
+.search-container button {
+    padding: 12px 20px;
+    margin-left: 10px;
+}
+
+.search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 5px;
+}
+
+.search-section {
+    padding: 10px;
+}
+
+.search-section h4 {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 8px;
+    padding: 0 10px;
+}
+
+.search-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.search-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.search-item:hover {
+    background-color: #f5f5f5;
+}
+
+.clear-history {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.clear-history:hover {
+    color: #d70f64;
+}
+
 
 /* 響應式設計 */
 @media (max-width: 768px) {

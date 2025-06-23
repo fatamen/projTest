@@ -1,31 +1,30 @@
 <template>
-    <h3>首頁 {{ userStore.email }}</h3>
-    <div class="address-container">
-        <input
-            v-model="address"
-            type="text"
-            placeholder="輸入台灣地址（例如：台灣台北市中正區忠孝東路一段100號）"
-            class="address-input"
-        >
-        <button @click="getCoordinates" class="query-button">查詢座標</button>
+    <section class="hero-section">
+        <h1>探索附近美食</h1>
+        <p>當前位置：{{ address || '台北市中正區' }}</p>
+        <input type="text" placeholder="輸入您的地址" v-model="address" />
+        <button @click="getCoordinates">搜尋</button>
+        <button style="background: transparent; border: none; color: white;" @click="getCurrentLocation">📍</button>
         <p v-if="loading" class="loading">正在查詢...</p>
         <p v-else-if="coordinates" class="result">
             經緯度：{{ coordinates.lat }}, {{ coordinates.lon }}
         </p>
         <p v-else-if="error" class="error">{{ error }}</p>
-    </div>
+    </section>
+
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import useUserStore from "@/stores/user.js";
+import { ref, computed, onMounted } from 'vue';
 
-const userStore = useUserStore();
-const address = ref(''); // 儲存輸入的地址
+//地址查詢用
+const address = ref('請輸入要查詢的地址'); // 儲存輸入的地址
 const coordinates = ref(null); // 儲存查詢到的座標
 const loading = ref(false); // 控制載入狀態
 const error = ref(''); // 儲存錯誤訊息
 
+
+// 輸入地址查詢
 // 格式化地址的函數
 const formatAddress = (input) => {
     if (!input.trim()) return input;
@@ -102,49 +101,78 @@ const getCoordinates = async () => {
         loading.value = false;
     }
 };
+
+
+// 獲取當前位置
+const getCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+        alert('您的瀏覽器不支援定位功能');
+        return;
+    }
+
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+
+        const { latitude, longitude } = position.coords;
+
+        // 使用 OpenStreetMap Nominatim API 將座標轉為地址
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
+        );
+        const data = await response.json();
+
+        if (data && data.display_name) {
+            address.value = data.display_name; // 更新地址
+        } else {
+            alert('無法解析地址，請稍後再試');
+        }
+    } catch (error) {
+        console.error('定位失敗:', error);
+        alert('無法獲取位置，請檢查權限或稍後再試');
+    }
+};
+
 </script>
 
 <style scoped>
-.address-container {
-    margin-top: 20px;
-    max-width: 600px;
+/* 搜尋與位置區域 */
+.hero-section {
+    background-color: #fff;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin: 20px;
+    border-radius: 8px;
 }
 
-.address-input {
-    width: 100%;
+.hero-section h1 {
+    font-size: 30px;
+    margin-bottom: 10px;
+}
+
+.hero-section p {
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.hero-section input {
+    width: 60%;
+    max-width: 400px;
     padding: 10px;
     font-size: 16px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    margin-bottom: 10px;
 }
 
-.query-button {
+.hero-section button {
     padding: 10px 20px;
-    background-color: #007bff;
+    background-color: #d70f64;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-}
-
-.query-button:hover {
-    background-color: #0056b3;
-}
-
-.loading {
-    color: #888;
-    margin-top: 10px;
-}
-
-.result {
-    color: #28a745;
-    font-weight: bold;
-    margin-top: 10px;
-}
-
-.error {
-    color: #dc3545;
-    margin-top: 10px;
+    margin-left: 10px;
 }
 </style>
