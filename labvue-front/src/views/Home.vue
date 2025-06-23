@@ -3,8 +3,8 @@
         <h1>探索附近美食</h1>
         <p>當前位置：{{ address || '台北市中正區' }}</p>
         <input type="text" placeholder="輸入您的地址" v-model="address" />
-        <button @click="getCoordinates">搜尋</button>
-        <button style="background: transparent; border: none; color: white;" @click="getCurrentLocation">📍</button>
+        <button @click="searchAddress">搜尋</button>        
+        <a  @click="getCurrentLocationAndNavigate"><button style="background: transparent; border: none; color: white;">📍</button></a>
         <p v-if="loading" class="loading">正在查詢...</p>
         <p v-else-if="coordinates" class="result">
             經緯度：{{ coordinates.lat }}, {{ coordinates.lon }}
@@ -16,13 +16,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+
 
 //地址查詢用
 const address = ref('請輸入要查詢的地址'); // 儲存輸入的地址
 const coordinates = ref(null); // 儲存查詢到的座標
 const loading = ref(false); // 控制載入狀態
 const error = ref(''); // 儲存錯誤訊息
-
+const router = useRouter();
 
 // 輸入地址查詢
 // 格式化地址的函數
@@ -64,75 +66,135 @@ const formatAddress = (input) => {
 
 // 查詢 Nominatim API 的函數
 const getCoordinates = async () => {
-    if (!address.value.trim()) {
-        error.value = '請輸入地址';
-        coordinates.value = null;
-        return;
-    }
-
-    // 格式化地址
-    address.value = formatAddress(address.value);
-
-    loading.value = true;
-    error.value = '';
+  if (!address.value.trim()) {
+    error.value = '請輸入地址';
     coordinates.value = null;
+    return false; // 表示失敗
+  }
 
-    try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address.value)}`;
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Jimmy/tokin81@yahoo.com.tw' // 請替換為你的應用名稱和聯繫方式
-            }
-        });
-        const data = await response.json();
+  // 格式化地址
+  address.value = formatAddress(address.value);
 
-        if (data.length > 0) {
-            coordinates.value = {
-                lat: data[0].lat,
-                lon: data[0].lon
-            };
-        } else {
-            error.value = '無法找到該地址的座標';
-        }
-    } catch (err) {
-        error.value = '查詢失敗，請稍後再試';
-        console.error('API 錯誤:', err);
-    } finally {
-        loading.value = false;
+  loading.value = true;
+  error.value = '';
+  coordinates.value = null;
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address.value)}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Jimmy/tokin81@yahoo.com.tw'
+      }
+    });
+    const data = await response.json();
+
+    if (data.length > 0) {
+      coordinates.value = {
+        lat: data[0].lat,
+        lon: data[0].lon
+      };
+      console.log('搜尋地址:', address.value); // 確認地址
+      return true; // 表示成功
+    } else {
+      error.value = '無法找到該地址的座標';
+      return false;
     }
+  } catch (err) {
+    error.value = '查詢失敗，請稍後再試';
+    console.error('API 錯誤:', err);
+    return false;
+  } finally {
+    loading.value = false;
+  }
 };
-
 
 // 獲取當前位置
 const getCurrentLocation = async () => {
-    if (!navigator.geolocation) {
-        alert('您的瀏覽器不支援定位功能');
-        return;
+  if (!navigator.geolocation) {
+    alert('您的瀏覽器不支援定位功能');
+    return false;
+  }
+
+  try {
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject);
+    });
+
+    const { latitude, longitude } = position.coords;
+
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
+    );
+    const data = await response.json();
+
+    if (data && data.display_name) {
+      address.value = formatTaiwanAddress(data.address);
+      console.log('當前位置地址:', address.value); // 確認地址
+      return true; // 表示成功
+    } else {
+      alert('無法解析地址，請稍後再試');
+      return false;
     }
-
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject);
-        });
-
-        const { latitude, longitude } = position.coords;
-
-        // 使用 OpenStreetMap Nominatim API 將座標轉為地址
-        const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
-        );
-        const data = await response.json();
-
-        if (data && data.display_name) {
-            address.value = data.display_name; // 更新地址
-        } else {
-            alert('無法解析地址，請稍後再試');
-        }
-    } catch (error) {
-        console.error('定位失敗:', error);
-        alert('無法獲取位置，請檢查權限或稍後再試');
-    }
+  } catch (error) {
+    console.error('定位失敗:', error);
+    alert('無法獲取位置，請檢查權限或稍後再試');
+    return false;
+  }
 };
+
+// 新增搜尋導航函數
+const searchAddress = async () => {
+  const success = await getCoordinates();
+  if (success) {
+    router.push({
+      path: '/search',
+      query: { address: address.value }
+    });
+  }
+};
+
+// 新增當前位置導航函數
+const getCurrentLocationAndNavigate = async () => {
+  const success = await getCurrentLocation();
+  if (success) {
+    router.push({
+      path: '/search',
+      query: { address: address.value }
+    });
+  }
+};
+
+// 格式化 Nominatim API 回傳的地址為台灣常見格式
+const formatTaiwanAddress = (addressData) => {
+    if (!addressData) return '';
+
+    // 提取地址各部分
+    const country = addressData.country || '臺灣';
+    const postcode = addressData.postcode || '';
+    const city = addressData.city || addressData.county || '';
+    const district = addressData.suburb || addressData.town || addressData.city_district || '';
+    const village = addressData.neighbourhood || addressData.village || ''; // 里
+    const road = addressData.road || '';
+    let houseNumber = addressData.house_number || '';
+
+    // 處理 "X之Y號" 格式，轉為 "Y號"
+    if (houseNumber.includes('之')) {
+        houseNumber = houseNumber.split('之')[1] || houseNumber;
+    }
+
+    // 組合地址，忽略空值
+    const parts = [
+        country,       
+        city,
+        district,
+        village,
+        road,
+        houseNumber
+    ].filter(part => part); // 過濾空值
+
+    return parts.join('');
+};
+
 
 </script>
 

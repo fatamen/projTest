@@ -2,6 +2,9 @@
     <!-- 導航欄 -->
     <header class="navbar">
         <div class="logo">外送平台</div>
+        <div>
+            <p>目前位置為:{{ address }}</p>
+        </div>
         <div class="nav-links">
             <a href="#" @click.prevent="toggleRestaurantMenu">{{ isRestaurant ? '餐廳' : '餐點' }}</a>
             <a href="#">優惠通知</a>
@@ -11,18 +14,35 @@
     </header>
 
     <!-- 搜尋與位置區域 -->
-    <!-- <section class="hero-section">
+    <section class="hero-section">
         <h1>探索附近美食</h1>
-        <p>當前位置：{{ address || '台北市中正區' }}</p>
-        <input type="text" placeholder="輸入您的地址" v-model="address" />
-        <button @click="getCoordinates">搜尋</button>
-        <button style="background: transparent; border: none; color: white;" @click="getCurrentLocation">📍</button>
-        <p v-if="loading" class="loading">正在查詢...</p>
-        <p v-else-if="coordinates" class="result">
-            經緯度：{{ coordinates.lat }}, {{ coordinates.lon }}
-        </p>
-        <p v-else-if="error" class="error">{{ error }}</p>
-    </section> -->
+        <div class="search-container">
+            <input type="text" placeholder="輸入您的查詢內容" v-model="searched" @focus="showDropdown = true"
+                @blur="hideDropdownWithDelay" @input="filterSuggestions" @keydown.enter="handleSearch" />
+            <button @click="handleSearch">搜尋</button>
+            <div class="search-dropdown" v-show="showDropdown">
+                <!-- 搜索歷史 -->
+                <div class="search-section" v-if="searchHistory.length > 0">
+                    <h4>最近搜尋</h4>
+                    <ul>
+                        <li v-for="(item, index) in filteredHistory" :key="item" @click="selectSuggestion(item)" class="search-item">
+                            {{ item }}
+                            <button class="clear-history" @click.stop.prevent="removeHistoryItem(item)">✕</button>
+                        </li>
+                    </ul>
+                </div>
+                <!-- 熱門搜索 -->
+                <div class="search-section">
+                    <h4>熱門搜尋</h4>
+                    <ul>
+                        <li v-for="(item, index) in filteredHotSearches" :key="index" @click="selectSuggestion(item)" class="search-item">
+                            {{ item }}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- 附近熱門美食 -->
     <section class="popular-section">
@@ -37,44 +57,6 @@
                     <div class="tags">
                         <span v-for="tag in restaurant.tags" :key="tag">{{ tag }}</span>
                     </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-
-    <!-- <section class="hero-section">
-        <h1>探索附近美食</h1>
-        <input type="text" placeholder="輸入您的查詢內容" v-model="searched" />
-        <button @click="getSearched">搜尋</button>
-    </section> -->
-    <section class="hero-section">
-        <h1>探索附近美食</h1>
-        <div class="search-container">
-            <input type="text" placeholder="輸入您的查詢內容" v-model="searched" @focus="showDropdown = true"
-                @blur="hideDropdownWithDelay" @input="filterSuggestions" @keydown.enter="handleSearch" />
-            <button @click="handleSearch">搜尋</button>
-            <div class="search-dropdown" v-show="showDropdown">
-                <!-- 搜索歷史 -->
-                <div class="search-section" v-if="searchHistory.length > 0">
-                    <h4>最近搜尋</h4>
-                    <ul>
-                        <li v-for="(item, index) in filteredHistory" :key="index"
-                            @mousedown.prevent="selectSuggestion(item)" class="search-item">
-                            {{ item }}
-                            <button class="clear-history" @mousedown.prevent="removeHistoryItem(index)">✕</button>
-                        </li>
-                    </ul>
-                </div>
-                <!-- 熱門搜索 -->
-                <div class="search-section">
-                    <h4>熱門搜尋</h4>
-                    <ul>
-                        <li v-for="(item, index) in filteredHotSearches" :key="index"
-                            @mousedown.prevent="selectSuggestion(item)" class="search-item">
-                            {{ item }}
-                        </li>
-                    </ul>
                 </div>
             </div>
         </div>
@@ -112,10 +94,9 @@
                 <label><input type="checkbox" v-model="filters.cuisine" value="korean"> 韓式</label>
             </div>
             <div class="filter-group">
-                <h4>配送時間</h4>
-                <input type="range" min="0" max="60" v-model.number="filters.deliveryTime"
-                    @input="updateDeliveryTime" />
-                <div class="range-value">{{ filters.deliveryTime }} 分鐘</div>
+            <h4>最低星數</h4>
+                <input type="range" min="0" max="5" step="0.5" v-model.number="filters.minRating" @input="updateRating" />
+                <div class="range-value">{{ filters.minRating }} 星</div>
             </div>
             <div class="filter-group">
                 <h4>優惠活動</h4>
@@ -158,16 +139,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 
 // 搜索相關
-const searched = ref(''); // 當前輸入的搜索內容
-const searchHistory = ref(JSON.parse(localStorage.getItem('searchHistory')) || []); // 搜索歷史
-const hotSearches = ref(['滷肉飯', '壽司', '披薩', '炸雞', '義大利麵']); // 熱門搜索
-const showDropdown = ref(false); // 控制下拉清單顯示
-const filteredHistory = ref([]); // 過濾後的搜索歷史
-const filteredHotSearches = ref([...hotSearches.value]); // 過濾後的熱門搜索
+const searched = ref('');
+const searchHistory = ref(JSON.parse(localStorage.getItem('searchHistory')) || []);
+const hotSearches = ref(['滷肉飯', '壽司', '披薩', '炸雞', '義大利麵']);
+const showDropdown = ref(false);
+const filteredHistory = ref([]);
+const filteredHotSearches = ref([...hotSearches.value]);
 
 // 保存搜索歷史到 localStorage
 const saveSearchHistory = () => {
@@ -178,15 +159,14 @@ const saveSearchHistory = () => {
 const handleSearch = () => {
     if (searched.value.trim()) {
         if (!searchHistory.value.includes(searched.value)) {
-            searchHistory.value.unshift(searched.value); // 將新搜索添加到歷史開頭
+            searchHistory.value.unshift(searched.value);
             if (searchHistory.value.length > 5) {
-                searchHistory.value.pop(); // 限制歷史記錄最多 5 條
+                searchHistory.value.pop();
             }
             saveSearchHistory();
         }
-        // 這裡可以添加實際的搜索邏輯，例如過濾餐廳
         console.log('搜尋內容:', searched.value);
-        showDropdown.value = false; // 搜索後隱藏下拉清單
+        showDropdown.value = false;
     }
 };
 
@@ -197,23 +177,27 @@ const selectSuggestion = (item) => {
 };
 
 // 刪除單個搜索歷史
-const removeHistoryItem = (index) => {
-    searchHistory.value.splice(index, 1);
-    saveSearchHistory();
+const removeHistoryItem = (item) => {
+    const index = searchHistory.value.indexOf(item);
+    if (index !== -1) {
+        searchHistory.value.splice(index, 1);
+        saveSearchHistory();
+        filterSuggestions();
+    }
 };
 
 // 過濾建議（歷史和熱門搜索）
 const filterSuggestions = () => {
     const query = searched.value.toLowerCase().trim();
-    filteredHistory.value = searchHistory.value.filter((item) =>
-        item.toLowerCase().includes(query)
-    );
-    filteredHotSearches.value = hotSearches.value.filter((item) =>
-        item.toLowerCase().includes(query)
-    );
+    filteredHistory.value = query
+        ? searchHistory.value.filter((item) => item.toLowerCase().includes(query))
+        : [...searchHistory.value];
+    filteredHotSearches.value = query
+        ? hotSearches.value.filter((item) => item.toLowerCase().includes(query))
+        : [...hotSearches.value];
 };
 
-// 延遲隱藏下拉清單（防止點擊建議時立即關閉）
+// 延遲隱藏下拉清單
 const hideDropdownWithDelay = () => {
     setTimeout(() => {
         showDropdown.value = false;
@@ -222,18 +206,17 @@ const hideDropdownWithDelay = () => {
 
 // 初始化時加載搜索歷史
 onMounted(() => {
-    filterSuggestions(); // 初始化建議清單
+    filterSuggestions();
 });
 
 
-//地址查詢用
-const address = ref('請輸入要查詢的地址'); // 儲存輸入的地址
+// 地址查詢用
+const route = useRoute();
+const address = ref(route.query.address || '請輸入要查詢的地址'); // 從查詢參數初始化
 const coordinates = ref(null); // 儲存查詢到的座標
 const loading = ref(false); // 控制載入狀態
 const error = ref(''); // 儲存錯誤訊息
 
-
-// 輸入地址查詢
 // 格式化地址的函數
 const formatAddress = (input) => {
     if (!input.trim()) return input;
@@ -251,23 +234,16 @@ const formatAddress = (input) => {
         const district = match[3] + match[4]; // 行政區 (如信義區)
         const road = match[5].trim(); // 路段巷弄 (如松山路465巷27弄)
         const number = match[6]; // 號 (如16號)
-
-        // 組合格式化後的地址
         return `${country} ${city} ${district} ${road} ${number}`;
     }
 
-    // 檢查是否為簡化地址
     match = input.match(simpleAddressRegex);
     if (match) {
-        // 提取簡化地址的各部分
         const road = match[1].trim(); // 路名 (如松江路)
         const number = match[2]; // 號 (如146號)
-
-        // 組合格式化後的地址
         return `${road} ${number}`;
     }
 
-    // 如果無法匹配，保留原始輸入
     return input;
 };
 
@@ -279,7 +255,6 @@ const getCoordinates = async () => {
         return;
     }
 
-    // 格式化地址
     address.value = formatAddress(address.value);
 
     loading.value = true;
@@ -290,7 +265,7 @@ const getCoordinates = async () => {
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address.value)}`;
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'Jimmy/tokin81@yahoo.com.tw' // 請替換為你的應用名稱和聯繫方式
+                'User-Agent': 'Jimmy/tokin81@yahoo.com.tw'
             }
         });
         const data = await response.json();
@@ -311,7 +286,6 @@ const getCoordinates = async () => {
     }
 };
 
-
 // 獲取當前位置
 const getCurrentLocation = async () => {
     if (!navigator.geolocation) {
@@ -326,14 +300,13 @@ const getCurrentLocation = async () => {
 
         const { latitude, longitude } = position.coords;
 
-        // 使用 OpenStreetMap Nominatim API 將座標轉為地址
         const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
         );
         const data = await response.json();
 
         if (data && data.display_name) {
-            address.value = data.display_name; // 更新地址
+            address.value = data.display_name;
         } else {
             alert('無法解析地址，請稍後再試');
         }
@@ -342,6 +315,17 @@ const getCurrentLocation = async () => {
         alert('無法獲取位置，請檢查權限或稍後再試');
     }
 };
+
+onMounted(() => {
+  console.log('初始路由地址:', route.query.address); // 確認查詢參數
+  address.value = route.query.address || '請輸入要查詢的地址';
+});
+
+// 監聽路由變化，動態更新地址
+watch(() => route.query.address, (newAddress) => {
+  address.value = newAddress || '請輸入要查詢的地址';
+});
+
 
 // 餐廳/餐點切換
 const isRestaurant = ref(true);
@@ -362,7 +346,7 @@ const restaurants = ref([
         tags: ['滷肉飯', '便當'],
         image: '/image/giachi.jpg',
         promo: '免運費',
-        popularityScore: 90,
+        popularityScore: 70,
     },
     {
         id: 2,
@@ -374,14 +358,14 @@ const restaurants = ref([
         tags: ['壽司', '生魚片'],
         image: '/image/sooshi.jpg',
         promo: '',
-        popularityScore: 95,
+        popularityScore: 80,
     },
     {
         id: 3,
         name: '披薩樂園',
         cuisine: '西式',
         deliveryTime: 30,
-        rating: 4,
+        rating: 4.5,
         reviews: 150,
         tags: ['披薩', '義大利麵'],
         image: '/image/pizza.jpg',
@@ -393,67 +377,67 @@ const restaurants = ref([
         name: '韓式炸雞',
         cuisine: '韓式',
         deliveryTime: 8,
-        rating: 4,
+        rating: 2,
         reviews: 80,
         tags: ['炸雞', '泡菜'],
         image: '/image/fryC.jpg',
         promo: '折扣',
-        popularityScore: 88,
+        popularityScore: 65,
     },
     {
         id: 5,
         name: 'haha餐廳',
         cuisine: '中式',
         deliveryTime: 25,
-        rating: 4,
+        rating: 3,
         reviews: 120,
         tags: ['滷肉飯', '便當'],
         image: '/image/giachi2.jpg',
         promo: '免運費',
-        popularityScore: 90,
+        popularityScore: 67,
     },
     {
         id: 6,
         name: 'lala之家',
         cuisine: '日式',
         deliveryTime: 10,
-        rating: 5,
+        rating: 3.5,
         reviews: 200,
         tags: ['壽司', '生魚片'],
         image: '/image/sooshi2.jpg',
         promo: '',
-        popularityScore: 95,
+        popularityScore: 75,
     },
     {
         id: 7,
         name: 'wola樂園',
         cuisine: '西式',
         deliveryTime: 30,
-        rating: 4,
+        rating: 5,
         reviews: 150,
         tags: ['披薩', '義大利麵'],
         image: '/image/pizza2.jpg',
         promo: '滿 $200 免運',
-        popularityScore: 85,
+        popularityScore: 90,
     },
     {
         id: 8,
         name: 'GG炸雞',
         cuisine: '韓式',
         deliveryTime: 8,
-        rating: 4,
+        rating: 4.5,
         reviews: 80,
         tags: ['炸雞', '泡菜'],
         image: '/image/fryC2.jpg',
         promo: '折扣',
-        popularityScore: 88,
+        popularityScore: 70,
     },
 ]);
 
 // 篩選條件
 const filters = ref({
     cuisine: [],
-    deliveryTime: 30,
+    minRating: 0,
     promo: [],
     rating: [],
 });
@@ -461,7 +445,7 @@ const filters = ref({
 // 排序選項
 const sortOption = ref('預設');
 
-// 計算屬性：熱門餐廳（按 popularityScore 排序前 10 名）
+// 計算屬性：熱門餐廳
 const popularRestaurants = computed(() => {
     return [...restaurants.value]
         .sort((a, b) => b.popularityScore - a.popularityScore)
@@ -472,17 +456,14 @@ const popularRestaurants = computed(() => {
 const filteredRestaurants = computed(() => {
     let filtered = [...restaurants.value];
 
-    // 篩選美食類型
     if (filters.value.cuisine.length > 0) {
         filtered = filtered.filter(restaurant =>
             filters.value.cuisine.includes(restaurant.cuisine.toLowerCase())
         );
     }
 
-    // 篩選配送時間
-    filtered = filtered.filter(restaurant => restaurant.deliveryTime <= filters.value.deliveryTime);
+    filtered = filtered.filter(restaurant => restaurant.rating >= filters.value.minRating);
 
-    // 篩選優惠
     if (filters.value.promo.length > 0) {
         filtered = filtered.filter(restaurant =>
             filters.value.promo.some(promo =>
@@ -491,14 +472,12 @@ const filteredRestaurants = computed(() => {
         );
     }
 
-    // 篩選評分
     if (filters.value.rating.length > 0) {
         filtered = filtered.filter(restaurant =>
             filters.value.rating.some(rating => restaurant.rating >= parseInt(rating))
         );
     }
 
-    // 排序
     if (sortOption.value === '評分最高') {
         filtered = filtered.sort((a, b) => b.rating - a.rating);
     } else if (sortOption.value === '距離最近' || sortOption.value === '最快送達') {
@@ -526,11 +505,9 @@ const applyFilter = (filterType) => {
 };
 
 // 更新配送時間
-const updateDeliveryTime = () => {
-    // 觸發篩選更新（由 computed 自動處理）
+const updateRating = () => {
+    // 觸發篩選更新
 };
-
-
 
 // 行動裝置篩選欄切換
 onMounted(() => {
@@ -544,11 +521,12 @@ onMounted(() => {
     toggleButton.addEventListener('click', () => {
         sidebar.classList.toggle('active');
     });
+
+    filterSuggestions(); // 初始化建議清單
 });
 </script>
 
 <style>
-/* 您的原始 CSS 樣式保持不變 */
 * {
     margin: 0;
     padding: 0;
@@ -861,7 +839,6 @@ body {
     margin: 0 10px;
 }
 
-
 .search-container {
     position: relative;
     display: flex;
@@ -939,12 +916,13 @@ body {
     color: #999;
     cursor: pointer;
     font-size: 14px;
+    padding: 5px;
+    line-height: 1;
 }
 
 .clear-history:hover {
     color: #d70f64;
 }
-
 
 /* 響應式設計 */
 @media (max-width: 768px) {
