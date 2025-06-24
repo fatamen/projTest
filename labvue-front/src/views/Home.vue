@@ -1,8 +1,8 @@
 <template>
     <section class="hero-section">
         <h1>探索附近美食</h1>
-        <p>當前位置：{{ address || '台北市中正區' }}</p>
-        <input type="text" placeholder="輸入您的地址" v-model="address" />
+        <p>當前位置：{{ address }}</p>
+        <input type="text" placeholder="輸入您的查詢內容"  v-model="address" />
         <button @click="searchAddress">搜尋</button>        
         <a  @click="getCurrentLocationAndNavigate"><button style="background: transparent; border: none; color: white;">📍</button></a>
         <p v-if="loading" class="loading">正在查詢...</p>
@@ -20,7 +20,7 @@ import { useRouter } from 'vue-router';
 
 
 //地址查詢用
-const address = ref('請輸入要查詢的地址'); // 儲存輸入的地址
+const address = ref(''); // 儲存輸入的地址
 const coordinates = ref(null); // 儲存查詢到的座標
 const loading = ref(false); // 控制載入狀態
 const error = ref(''); // 儲存錯誤訊息

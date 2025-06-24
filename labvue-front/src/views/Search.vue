@@ -1,17 +1,45 @@
 <template>
     <!-- 導航欄 -->
     <header class="navbar">
-        <div class="logo">外送平台</div>
+        <div class="logo">金碗GoldenBowl Foolog</div>
         <div>
-            <p>目前位置為:{{ address }}</p>
+            <button class="location-btn" @click="showPopout = true">
+                目前位置為: {{ address }}<a @click.stop="getCurrentLocationAndNavigate"><button style="background: transparent; border: none; color: white;">📍</button></a>
+            </button>
         </div>
         <div class="nav-links">
             <a href="#" @click.prevent="toggleRestaurantMenu">{{ isRestaurant ? '餐廳' : '餐點' }}</a>
             <a href="#">優惠通知</a>
             <a href="#">購物車</a>
-            <a href="#">登入</a>
+            <a href="#" @click="getLogin" v-if="!isLoggedIn">登入</a>
+            <UserDropdown v-if="isLoggedIn" />     
         </div>
     </header>
+    <section class="popout" v-if="showPopout">
+        <div class="popout-content">
+            <button class="close-btn" @click="showPopout = false">✕</button>         
+            <input type="text" placeholder="輸入您的地址" @focus="address = ''" v-model="address" />
+            <button class="search-btn" @click="searchAddress">搜尋</button>
+        </div>
+    </section>
+
+    <!-- 附近熱門美食 -->
+    <section class="popular-section" v-if="address !=''">
+        <h2>附近熱門美食</h2>
+        <div class="restaurant-scroll">
+            <div class="restaurant-card" v-for="restaurant in popularRestaurants" :key="restaurant.id">
+                <img :src="restaurant.image" :alt="restaurant.name" />
+                <div class="info">
+                    <h3>{{ restaurant.name }}</h3>
+                    <p>{{ restaurant.cuisine }} • {{ restaurant.deliveryTime }} 分鐘</p>
+                    <p>{{ restaurant.rating }} ({{ restaurant.reviews }}+ 評價)</p>
+                    <div class="tags">
+                        <span v-for="tag in restaurant.tags" :key="tag">{{ tag }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- 搜尋與位置區域 -->
     <section class="hero-section">
@@ -41,74 +69,29 @@
                     </ul>
                 </div>
             </div>
-        </div>
-    </section>
+        </div>    
+    </section>          
 
-    <!-- 附近熱門美食 -->
-    <section class="popular-section">
-        <h2>附近熱門美食</h2>
-        <div class="restaurant-scroll">
-            <div class="restaurant-card" v-for="restaurant in popularRestaurants" :key="restaurant.id">
-                <img :src="restaurant.image" :alt="restaurant.name" />
-                <div class="info">
-                    <h3>{{ restaurant.name }}</h3>
-                    <p>{{ restaurant.cuisine }} • {{ restaurant.deliveryTime }} 分鐘</p>
-                    <p>{{ restaurant.rating }} ({{ restaurant.reviews }}+ 評價)</p>
-                    <div class="tags">
-                        <span v-for="tag in restaurant.tags" :key="tag">{{ tag }}</span>
-                    </div>
-                </div>
+        <!-- 篩選與排序（頂部） -->
+        <div class="filter-toggle" @click="toggleSidebar">篩選條件</div>
+        <section class="filters">
+            <TopFilterButtons :filters="filters" @update:filters="filters = $event" />
+            <div class="sort">
+                <select v-model="sortOption" @change="sortRestaurants">          
+                    <option value="評分最高">評分最高</option>
+                    <option value="距離最近">距離最近</option>
+                    <option value="最快送達">最快送達</option>
+                </select>
             </div>
-        </div>
-    </section>
-
-    <!-- 篩選與排序（頂部） -->
-    <section class="filters">
-        <div class="filter-buttons">
-            <button @click="applyFilter('全部')">全部</button>
-            <button @click="applyFilter('中式')">中式</button>
-            <button @click="applyFilter('日式')">日式</button>
-            <button @click="applyFilter('西式')">西式</button>
-            <button @click="applyFilter('免運費')">免運費</button>
-        </div>
-        <div class="sort">
-            <select v-model="sortOption" @change="sortRestaurants">
-                <option value="預設">排序：預設</option>
-                <option value="評分最高">評分最高</option>
-                <option value="距離最近">距離最近</option>
-                <option value="最快送達">最快送達</option>
-            </select>
-        </div>
-    </section>
+        </section>    
 
     <!-- 內容容器 -->
     <div class="content-container">
         <!-- 左側篩選欄 -->
-        <aside class="sidebar">
-            <h3>篩選條件</h3>
-            <div class="filter-group">
-                <h4>美食類型</h4>
-                <label><input type="checkbox" v-model="filters.cuisine" value="chinese"> 中式</label>
-                <label><input type="checkbox" v-model="filters.cuisine" value="japanese"> 日式</label>
-                <label><input type="checkbox" v-model="filters.cuisine" value="western"> 西式</label>
-                <label><input type="checkbox" v-model="filters.cuisine" value="korean"> 韓式</label>
-            </div>
-            <div class="filter-group">
-            <h4>最低星數</h4>
-                <input type="range" min="0" max="5" step="0.5" v-model.number="filters.minRating" @input="updateRating" />
-                <div class="range-value">{{ filters.minRating }} 星</div>
-            </div>
-            <div class="filter-group">
-                <h4>優惠活動</h4>
-                <label><input type="checkbox" v-model="filters.promo" value="free-delivery"> 免運費</label>
-                <label><input type="checkbox" v-model="filters.promo" value="discount"> 折扣</label>
-            </div>
-            <div class="filter-group">
-                <h4>評分</h4>
-                <label><input type="checkbox" v-model="filters.rating" value="4"> 4 星以上</label>
-                <label><input type="checkbox" v-model="filters.rating" value="3"> 3 星以上</label>
-            </div>
+        <aside class="sidebar" :class="{ active: isSidebarActive }">
+            <SidebarFilters :filters="filters" @update:filters="filters = $event" @update-rating="updateRating" />
         </aside>
+        
 
         <!-- 餐廳列表 -->
         <section class="restaurant-list">
@@ -139,8 +122,33 @@
 </template>
 
 <script setup>
+const isLoggedIn = ref(true)
+
+
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import TopFilterButtons from '@/components/TopFilterButtons.vue';
+import SidebarFilters from '@/components/SidebarFilters.vue';
+import UserDropdown from '@/components/UserDropdown.vue';
+
+
+
+
+const isSidebarActive = ref(false);
+const toggleSidebar = () => {
+  isSidebarActive.value = !isSidebarActive.value;
+};
+
+
+// 控制彈出視窗的顯示
+const showPopout = ref(false);
+
+// 搜尋地址（假設已存在，僅確保關閉彈窗）
+const searchAddress = () => {
+  getCoordinates(); // 調用已有的地址查詢函數
+  showPopout.value = false; // 搜尋後關閉彈窗
+};
+
 
 // 搜索相關
 const searched = ref('');
@@ -212,7 +220,7 @@ onMounted(() => {
 
 // 地址查詢用
 const route = useRoute();
-const address = ref(route.query.address || '請輸入要查詢的地址'); // 從查詢參數初始化
+const address = ref(route.query.address || ''); // 從查詢參數初始化
 const coordinates = ref(null); // 儲存查詢到的座標
 const loading = ref(false); // 控制載入狀態
 const error = ref(''); // 儲存錯誤訊息
@@ -286,44 +294,91 @@ const getCoordinates = async () => {
     }
 };
 
+// 新增當前位置導航函數
+const getCurrentLocationAndNavigate = async () => {
+    const success = await getCurrentLocation();
+    if (success) {
+        router.push({
+        path: '/search',
+        query: { address: address.value }
+        });
+    }
+};
+
+
+// 格式化 Nominatim API 回傳的地址為台灣常見格式
+const formatTaiwanAddress = (addressData) => {
+    if (!addressData) return '';
+
+    // 提取地址各部分
+    const country = addressData.country || '臺灣';
+    const postcode = addressData.postcode || '';
+    const city = addressData.city || addressData.county || '';
+    const district = addressData.suburb || addressData.town || addressData.city_district || '';
+    const village = addressData.neighbourhood || addressData.village || ''; // 里
+    const road = addressData.road || '';
+    let houseNumber = addressData.house_number || '';
+
+    // 處理 "X之Y號" 格式，轉為 "Y號"
+    if (houseNumber.includes('之')) {
+        houseNumber = houseNumber.split('之')[1] || houseNumber;
+    }
+
+    // 組合地址，忽略空值
+    const parts = [
+        country,       
+        city,
+        district,
+        village,
+        road,
+        houseNumber
+    ].filter(part => part); // 過濾空值
+
+    return parts.join('');
+};
+
+
 // 獲取當前位置
 const getCurrentLocation = async () => {
-    if (!navigator.geolocation) {
-        alert('您的瀏覽器不支援定位功能');
-        return;
+  if (!navigator.geolocation) {
+    alert('您的瀏覽器不支援定位功能');
+    return false;
+  }
+
+  try {
+    const position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject);
+    });
+
+    const { latitude, longitude } = position.coords;
+
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
+    );
+    const data = await response.json();
+
+    if (data && data.display_name) {
+      address.value = formatTaiwanAddress(data.address);      
+      return true; // 表示成功
+    } else {
+      alert('無法解析地址，請稍後再試');
+      return false;
     }
-
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject);
-        });
-
-        const { latitude, longitude } = position.coords;
-
-        const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`
-        );
-        const data = await response.json();
-
-        if (data && data.display_name) {
-            address.value = data.display_name;
-        } else {
-            alert('無法解析地址，請稍後再試');
-        }
-    } catch (error) {
-        console.error('定位失敗:', error);
-        alert('無法獲取位置，請檢查權限或稍後再試');
-    }
+  } catch (error) {
+    console.error('定位失敗:', error);
+    alert('無法獲取位置，請檢查權限或稍後再試');
+    return false;
+  }
 };
 
 onMounted(() => {
   console.log('初始路由地址:', route.query.address); // 確認查詢參數
-  address.value = route.query.address || '請輸入要查詢的地址';
+  address.value = route.query.address || '';
 });
 
 // 監聽路由變化，動態更新地址
 watch(() => route.query.address, (newAddress) => {
-  address.value = newAddress || '請輸入要查詢的地址';
+  address.value = newAddress || '';
 });
 
 
@@ -438,12 +493,11 @@ const restaurants = ref([
 const filters = ref({
     cuisine: [],
     minRating: 0,
-    promo: [],
-    rating: [],
+    promo: []
 });
 
 // 排序選項
-const sortOption = ref('預設');
+const sortOption = ref('評分最高');
 
 // 計算屬性：熱門餐廳
 const popularRestaurants = computed(() => {
@@ -454,55 +508,28 @@ const popularRestaurants = computed(() => {
 
 // 計算屬性：篩選後的餐廳列表
 const filteredRestaurants = computed(() => {
-    let filtered = [...restaurants.value];
+  let filtered = [...restaurants.value];
 
-    if (filters.value.cuisine.length > 0) {
-        filtered = filtered.filter(restaurant =>
-            filters.value.cuisine.includes(restaurant.cuisine.toLowerCase())
-        );
-    }
+  if (filters.value.cuisine.length > 0) {
+    filtered = filtered.filter(restaurant => filters.value.cuisine.includes(restaurant.cuisine));
+  }
 
-    filtered = filtered.filter(restaurant => restaurant.rating >= filters.value.minRating);
+  filtered = filtered.filter(restaurant => restaurant.rating >= filters.value.minRating);
 
-    if (filters.value.promo.length > 0) {
-        filtered = filtered.filter(restaurant =>
-            filters.value.promo.some(promo =>
-                restaurant.promo.toLowerCase().includes(promo)
-            )
-        );
-    }
+  if (filters.value.promo.length > 0) {
+    filtered = filtered.filter(restaurant =>
+      filters.value.promo.some(promo => restaurant.promo.includes(promo))
+    );
+  }
 
-    if (filters.value.rating.length > 0) {
-        filtered = filtered.filter(restaurant =>
-            filters.value.rating.some(rating => restaurant.rating >= parseInt(rating))
-        );
-    }
+  if (sortOption.value === '評分最高') {
+    filtered = filtered.sort((a, b) => b.rating - a.rating);
+  } else if (sortOption.value === '距離最近' || sortOption.value === '最快送達') {
+    filtered = filtered.sort((a, b) => a.deliveryTime - b.deliveryTime);
+  }
 
-    if (sortOption.value === '評分最高') {
-        filtered = filtered.sort((a, b) => b.rating - a.rating);
-    } else if (sortOption.value === '距離最近' || sortOption.value === '最快送達') {
-        filtered = filtered.sort((a, b) => a.deliveryTime - b.deliveryTime);
-    }
-
-    return filtered;
+  return filtered;
 });
-
-// 應用頂部篩選按鈕
-const applyFilter = (filterType) => {
-    if (filterType === '全部') {
-        filters.value.cuisine = [];
-        filters.value.promo = [];
-    } else if (['中式', '日式', '西式', '韓式'].includes(filterType)) {
-        const cuisineLower = filterType.toLowerCase();
-        if (!filters.value.cuisine.includes(cuisineLower)) {
-            filters.value.cuisine.push(cuisineLower);
-        }
-    } else if (filterType === '免運費') {
-        if (!filters.value.promo.includes('free-delivery')) {
-            filters.value.promo.push('free-delivery');
-        }
-    }
-};
 
 // 更新配送時間
 const updateRating = () => {
@@ -511,17 +538,6 @@ const updateRating = () => {
 
 // 行動裝置篩選欄切換
 onMounted(() => {
-    const toggleButton = document.createElement('div');
-    toggleButton.className = 'filter-toggle';
-    toggleButton.textContent = '篩選條件';
-    const sidebar = document.querySelector('.sidebar');
-    const filtersSection = document.querySelector('.filters');
-    filtersSection.insertAdjacentElement('beforebegin', toggleButton);
-
-    toggleButton.addEventListener('click', () => {
-        sidebar.classList.toggle('active');
-    });
-
     filterSuggestions(); // 初始化建議清單
 });
 </script>
@@ -702,21 +718,6 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.filters .filter-buttons button {
-    padding: 8px 16px;
-    border: 1px solid #ccc;
-    background-color: #fff;
-    cursor: pointer;
-    border-radius: 20px;
-    margin-right: 10px;
-    font-size: 14px;
-}
-
-.filters .filter-buttons button:hover {
-    background-color: #d70f64;
-    color: white;
-}
-
 .filters .sort select {
     padding: 8px;
     border: 1px solid #ccc;
@@ -729,45 +730,6 @@ body {
     display: flex;
     padding: 20px;
     gap: 20px;
-}
-
-/* 左側篩選欄 */
-.sidebar {
-    width: 250px;
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.sidebar h3 {
-    font-size: 18px;
-    margin-bottom: 15px;
-}
-
-.filter-group {
-    margin-bottom: 20px;
-}
-
-.filter-group label {
-    display: block;
-    margin-bottom: 10px;
-    font-size: 14px;
-    color: #333;
-}
-
-.filter-group input[type="checkbox"] {
-    margin-right: 8px;
-}
-
-.filter-group input[type="range"] {
-    width: 100%;
-}
-
-.filter-group .range-value {
-    font-size: 14px;
-    color: #666;
-    margin-top: 5px;
 }
 
 /* 餐廳列表 */
@@ -924,6 +886,98 @@ body {
     color: #d70f64;
 }
 
+/* 彈出視窗樣式 */
+.popout {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.popout-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    position: relative;
+    text-align: center;
+}
+
+.popout-content h3 {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.popout-content input {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.search-btn {
+    padding: 10px 20px;
+    background-color: #d70f64;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+}
+
+.search-btn:hover {
+    background-color: #b00c50;
+}
+
+.close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #999;
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    color: #d70f64;
+}
+
+
+/* 導航欄按鈕美化 */
+.location-btn {
+    background-color: transparent;
+    color: white;
+    border: 1px solid #fff;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.location-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+
+
+
 /* 響應式設計 */
 @media (max-width: 768px) {
     .content-container {
@@ -965,5 +1019,14 @@ body {
     .filter-toggle {
         display: none;
     }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+  .sidebar.active {
+    display: block;
+  }
 }
 </style>
